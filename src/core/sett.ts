@@ -5,6 +5,9 @@
 
 import { Sett, ThreadStripe, ExpandedSett, SettSignature } from './types';
 
+// Re-export types for convenience
+export type { Sett, ThreadStripe, ExpandedSett, SettSignature };
+
 // ============================================================================
 // THREADCOUNT PARSING
 // ============================================================================

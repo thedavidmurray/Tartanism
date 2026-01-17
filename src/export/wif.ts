@@ -3,10 +3,10 @@
  * Generate Weaving Information File format for loom software
  */
 
-import { Sett, WIFExport, WeavePattern } from './types';
-import { expandSett } from './sett';
-import { getWeavePattern, generateThreading, generateTreadling } from './weaves';
-import { TARTAN_COLORS, getColor } from './colors';
+import { Sett, WIFExport, WeavePattern } from '../core/types';
+import { expandSett } from '../core/sett';
+import { generateThreading, generateTreadling } from '../core/weaves';
+import { getColor } from '../core/colors';
 
 // ============================================================================
 // WIF FILE GENERATION

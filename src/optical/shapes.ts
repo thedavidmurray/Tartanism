@@ -3,7 +3,10 @@
  * Generate brightness/color masks for 3D effects on tartan patterns
  */
 
-import { ShapeMaskType, ShapeMaskOptions, MaskedRegion } from './types';
+import { ShapeMaskType, ShapeMaskOptions, MaskedRegion } from '../core/types';
+
+// Re-export types for convenience
+export type { ShapeMaskType, ShapeMaskOptions, MaskedRegion };
 
 // ============================================================================
 // MASK GENERATION

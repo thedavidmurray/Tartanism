@@ -6,6 +6,9 @@
 import { WeaveType, WeavePattern, WovenPixel } from './types';
 import { ExpandedSett, getThreadAt } from './sett';
 
+// Re-export types for convenience
+export type { WeaveType, WeavePattern, WovenPixel };
+
 // ============================================================================
 // WEAVE PATTERN DEFINITIONS
 // ============================================================================

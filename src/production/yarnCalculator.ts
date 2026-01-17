@@ -3,17 +3,17 @@
  * Calculate yarn requirements for production planning
  */
 
-import { 
-  Sett, 
-  YarnWeight, 
-  YarnProfile, 
-  ProductDimensions, 
+import {
+  Sett,
+  YarnWeight,
+  YarnProfile,
+  ProductDimensions,
   ProductTemplate,
   YarnRequirement,
-  MaterialsCalculation 
-} from './types';
-import { expandSett } from './sett';
-import { getColor } from './colors';
+  MaterialsCalculation
+} from '../core/types';
+import { expandSett } from '../core/sett';
+import { getColor } from '../core/colors';
 
 // ============================================================================
 // YARN PROFILES

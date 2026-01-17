@@ -1,29 +1,13 @@
 {
-  "name": "tartan-system",
-  "version": "0.1.0",
-  "description": "A complete tartan design-to-production platform for creating, exploring, and manufacturing mathematically valid tartan patterns",
+  "name": "tartanism",
+  "version": "1.0.0",
+  "description": "The best plaid maker on the internet - create mathematically valid tartans",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
-  },
-  "files": [
-    "dist",
-    "src"
-  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:lib": "tsc",
     "preview": "vite preview",
-    "lint": "eslint src --ext ts,tsx",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest"
+    "deploy": "npm run build && gh-pages -d dist"
   },
   "keywords": [
     "tartan",
@@ -35,15 +19,26 @@
     "scottish",
     "design"
   ],
-  "author": "Tartan System",
+  "author": "David Murray",
   "license": "MIT",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
   "devDependencies": {
     "@types/node": "^20.10.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "autoprefixer": "^10.4.16",
+    "gh-pages": "^6.1.0",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.6",
     "typescript": "^5.3.2",
-    "vite": "^5.0.0",
-    "vitest": "^1.0.0"
+    "vite": "^5.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "homepage": "https://thedavidmurray.github.io/Tartanism"
 }
