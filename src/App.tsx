@@ -1941,12 +1941,57 @@ function CrestBuilder({
   const [monogramText, setMonogramText] = useState('');
   const [shape, setShape] = useState<keyof typeof MONOGRAM_SHAPES>('shield');
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [originalImage, setOriginalImage] = useState<string | null>(null); // For before/after
+  const [maxColors, setMaxColors] = useState(8); // Jacquard color limit
+  const [quantizeColors, setQuantizeColors] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const originalCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const technique = CREST_TECHNIQUES[crestConfig.technique];
   const resolution = Math.round(crestConfig.targetSize * crestConfig.threadGauge);
   const isDetailSufficient = crestConfig.targetSize >= technique.minDetail;
+
+  // Color quantization using median cut algorithm (simplified)
+  const quantizeImageColors = (ctx: CanvasRenderingContext2D, width: number, height: number, numColors: number) => {
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const pixels = imageData.data;
+
+    // Collect all unique colors
+    const colorCounts: Map<string, number> = new Map();
+    for (let i = 0; i < pixels.length; i += 4) {
+      const key = `${pixels[i]},${pixels[i+1]},${pixels[i+2]}`;
+      colorCounts.set(key, (colorCounts.get(key) || 0) + 1);
+    }
+
+    // Sort by frequency and take top N colors
+    const sortedColors = Array.from(colorCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, numColors)
+      .map(([key]) => key.split(',').map(Number));
+
+    // Map each pixel to nearest palette color
+    for (let i = 0; i < pixels.length; i += 4) {
+      const r = pixels[i], g = pixels[i+1], b = pixels[i+2];
+      let minDist = Infinity;
+      let nearest = sortedColors[0];
+
+      for (const [pr, pg, pb] of sortedColors) {
+        const dist = (r-pr)**2 + (g-pg)**2 + (b-pb)**2;
+        if (dist < minDist) {
+          minDist = dist;
+          nearest = [pr, pg, pb];
+        }
+      }
+
+      pixels[i] = nearest[0];
+      pixels[i+1] = nearest[1];
+      pixels[i+2] = nearest[2];
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    return sortedColors.length;
+  };
 
   // Render the crest preview
   useEffect(() => {
@@ -1971,10 +2016,17 @@ function CrestBuilder({
     ctx.fillStyle = crestConfig.foregroundColor;
 
     if (uploadedImage) {
-      // Draw uploaded image
+      // Draw uploaded image at target resolution (pixelated)
       const img = new Image();
       img.onload = () => {
+        // Draw image scaled down to thread resolution
         ctx.drawImage(img, 0, 0, size, size);
+
+        // Apply color quantization if enabled
+        if (quantizeColors && maxColors > 0) {
+          quantizeImageColors(ctx, size, size, maxColors);
+        }
+
         updatePreview();
       };
       img.src = uploadedImage;
@@ -2006,7 +2058,7 @@ function CrestBuilder({
       previewCtx.imageSmoothingEnabled = false; // Keep pixelated look
       previewCtx.drawImage(canvas, 0, 0, previewSize, previewSize);
     }
-  }, [crestConfig, monogramText, shape, uploadedImage, resolution]);
+  }, [crestConfig, monogramText, shape, uploadedImage, resolution, quantizeColors, maxColors]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2014,7 +2066,10 @@ function CrestBuilder({
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      setUploadedImage(event.target?.result as string);
+      const dataUrl = event.target?.result as string;
+      setOriginalImage(dataUrl); // Store original for before/after
+      setUploadedImage(dataUrl);
+      setMonogramText(''); // Clear text when image uploaded
     };
     reader.readAsDataURL(file);
   };
@@ -2176,7 +2231,7 @@ function CrestBuilder({
 
             {/* Image Upload */}
             <div>
-              <label className="label">Or Upload Image</label>
+              <label className="label">Or Upload Image (Logo, Crest, Photo)</label>
               <input
                 type="file"
                 accept="image/*"
@@ -2184,16 +2239,72 @@ function CrestBuilder({
                 className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
               />
               {uploadedImage && (
-                <button
-                  onClick={() => setUploadedImage(null)}
-                  className="text-xs text-red-400 hover:text-red-300 mt-2"
-                >
-                  Clear uploaded image
-                </button>
+                <div className="mt-3 space-y-3">
+                  <button
+                    onClick={() => { setUploadedImage(null); setOriginalImage(null); }}
+                    className="text-xs text-red-400 hover:text-red-300"
+                  >
+                    Clear uploaded image
+                  </button>
+
+                  {/* Color Quantization Controls */}
+                  <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm text-gray-300">Limit Colors (for looms)</label>
+                      <button
+                        onClick={() => setQuantizeColors(!quantizeColors)}
+                        className={`w-10 h-5 rounded-full transition-colors ${quantizeColors ? 'bg-indigo-600' : 'bg-gray-700'}`}
+                      >
+                        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${quantizeColors ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      </button>
+                    </div>
+                    {quantizeColors && (
+                      <div>
+                        <label className="text-xs text-gray-500">Max Colors: {maxColors}</label>
+                        <input
+                          type="range"
+                          min="2"
+                          max="16"
+                          value={maxColors}
+                          onChange={(e) => setMaxColors(parseInt(e.target.value))}
+                          className="slider w-full"
+                        />
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>2 (simple)</span>
+                          <span>6 (Lochcarron)</span>
+                          <span>16 (detailed)</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Before/After Preview */}
+                  {originalImage && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">Original</p>
+                        <img
+                          src={originalImage}
+                          alt="Original"
+                          className="w-full aspect-square object-cover rounded border border-gray-700"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">Weavable ({resolution}px)</p>
+                        <canvas
+                          ref={previewCanvasRef}
+                          className="w-full aspect-square rounded border border-gray-700"
+                          style={{ imageRendering: 'pixelated' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
-            {/* Colors */}
+            {/* Colors (only show when no image uploaded) */}
+            {!uploadedImage && (
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="label">Background</label>
@@ -2214,6 +2325,7 @@ function CrestBuilder({
                 />
               </div>
             </div>
+            )}
           </div>
 
           {/* Preview Panel */}
