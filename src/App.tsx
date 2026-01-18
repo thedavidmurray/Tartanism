@@ -1595,27 +1595,49 @@ function TiledPreviewModal({
   onClose: () => void;
 }) {
   const [tileSize, setTileSize] = useState<TileSize>('pocket');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(2);
   const { sett } = data.result;
   const expanded = expandSett(sett);
   const settInches = expanded.length / config.threadGauge;
   const tileConfig = TILE_SIZES[tileSize];
   const physicalSize = (settInches * tileConfig.repeats).toFixed(1);
 
+  // Responsive scale calculation
+  useEffect(() => {
+    const calculateScale = () => {
+      if (!containerRef.current) return;
+      const containerWidth = containerRef.current.clientWidth - 32; // padding
+      const containerHeight = window.innerHeight * 0.5; // 50vh max for canvas
+      const patternSize = expanded.length * tileConfig.repeats;
+
+      // Calculate scale to fit within container
+      const scaleX = containerWidth / patternSize;
+      const scaleY = containerHeight / patternSize;
+      const newScale = Math.max(1, Math.min(4, Math.floor(Math.min(scaleX, scaleY))));
+      setScale(newScale);
+    };
+
+    calculateScale();
+    window.addEventListener('resize', calculateScale);
+    return () => window.removeEventListener('resize', calculateScale);
+  }, [expanded.length, tileConfig.repeats]);
+
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="card max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Tiled Preview</h2>
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="card w-full max-w-[95vw] sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="p-3 sm:p-4 border-b border-gray-800 flex items-center justify-between">
+          <h2 className="text-lg sm:text-xl font-semibold">Tiled Preview</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          <div className="flex flex-wrap gap-2">
+        <div ref={containerRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
+          <div className="flex flex-wrap gap-1 sm:gap-2">
             {(Object.keys(TILE_SIZES) as TileSize[]).map(size => (
               <button
                 key={size}
                 onClick={() => setTileSize(size)}
-                className={`px-4 py-2 rounded-lg transition-colors ${
+                className={`px-2 sm:px-4 py-1 sm:py-2 text-sm sm:text-base rounded-lg transition-colors ${
                   tileSize === size
                     ? 'bg-indigo-600 text-white'
                     : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
@@ -1626,24 +1648,24 @@ function TiledPreviewModal({
             ))}
           </div>
 
-          <div className="text-sm text-gray-400">
+          <div className="text-xs sm:text-sm text-gray-400">
             {tileConfig.repeats}x{tileConfig.repeats} repeats = ~{physicalSize}" x {physicalSize}"
           </div>
 
-          <div className="overflow-auto">
+          <div className="overflow-auto flex justify-center">
             <TartanCanvas
               sett={sett}
               weaveType={config.weaveType}
-              scale={2}
+              scale={scale}
               repeats={tileConfig.repeats}
               shapeMask={data.isOptical ? config.shapeMask : undefined}
               customColors={customColors}
-              className="mx-auto rounded-lg"
+              className="rounded-lg max-w-full"
             />
           </div>
         </div>
 
-        <div className="p-4 border-t border-gray-800 flex gap-3 justify-end">
+        <div className="p-3 sm:p-4 border-t border-gray-800 flex gap-3 justify-end">
           <button onClick={onClose} className="btn-secondary">Close</button>
         </div>
       </div>
