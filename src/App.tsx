@@ -679,7 +679,7 @@ function TartanCard({
         shapeMask={isOptical ? config.shapeMask : undefined}
         customColors={customColors}
         isBlanket={isBlanket}
-        onClick={() => onTiledPreview(data)}
+        onClick={breedingMode ? undefined : () => onTiledPreview(data)}
         className="w-full aspect-square rounded-lg"
       />
 
