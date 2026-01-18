@@ -343,6 +343,23 @@ export const TARTAN_COLORS: Record<string, TartanColor> = {
   'PK': createColor('PK', 'Pink',           '#FF69B4', 'pink'),
   'LP2': createColor('LP2', 'Light Pink',   '#FFB6C1', 'pink'),
   'DP2': createColor('DP2', 'Deep Pink',    '#FF1493', 'pink'),
+
+  // Neons & Fluorescents (UV-reactive yarns available)
+  'NP': createColor('NP', 'Neon Pink',         '#FF6EC7', 'neon'),
+  'NY': createColor('NY', 'Neon Yellow',       '#FFFF33', 'neon'),
+  'NO': createColor('NO', 'Neon Orange',       '#FF5F1F', 'neon'),
+  'NG': createColor('NG', 'Neon Green',        '#39FF14', 'neon'),
+  'NE': createColor('NE', 'Neon Blue',         '#00AFEC', 'neon'),
+  'NC': createColor('NC', 'Neon Cyan',         '#00FFFF', 'neon'),
+  'NM': createColor('NM', 'Neon Magenta',      '#FF00FF', 'neon'),
+  'NV': createColor('NV', 'Neon Violet',       '#BF00FF', 'neon'),
+  'NR': createColor('NR', 'Neon Coral',        '#FF6F61', 'neon'),
+  'NL': createColor('NL', 'Neon Lime',         '#CCFF00', 'neon'),
+  'NT': createColor('NT', 'Neon Turquoise',    '#00FFD1', 'neon'),
+  'NS': createColor('NS', 'Neon Salmon',       '#FF6D88', 'neon'),
+  'NA': createColor('NA', 'Neon Aqua',         '#00FFC8', 'neon'),
+  'NW': createColor('NW', 'UV White',          '#F0F0FF', 'neon'),
+  'UV': createColor('UV', 'UV Reactive Blue',  '#1B03A3', 'neon'),
 };
 
 export const DEFAULT_PALETTE: ColorPalette = {

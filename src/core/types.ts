@@ -34,19 +34,20 @@ export interface TartanColor {
   category: ColorCategory;
 }
 
-export type ColorCategory = 
-  | 'blue' 
-  | 'red' 
-  | 'green' 
-  | 'yellow' 
-  | 'black' 
-  | 'white' 
-  | 'grey' 
-  | 'brown' 
-  | 'purple' 
+export type ColorCategory =
+  | 'blue'
+  | 'red'
+  | 'green'
+  | 'yellow'
+  | 'black'
+  | 'white'
+  | 'grey'
+  | 'brown'
+  | 'purple'
   | 'orange'
   | 'pink'
-  | 'teal';
+  | 'teal'
+  | 'neon';
 
 export interface ColorPalette {
   name: string;

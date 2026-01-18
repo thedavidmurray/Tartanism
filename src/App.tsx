@@ -54,7 +54,7 @@ const LOOM_CONSTRAINTS = {
   ],
 };
 
-type ViewMode = 'generator' | 'builder';
+type ViewMode = 'generator' | 'builder' | 'crest';
 
 type TileSize = 'swatch' | 'pocket' | 'tie' | 'scarf' | 'kilt' | 'blanket';
 
@@ -71,6 +71,57 @@ const TILE_SIZES: Record<TileSize, { repeats: number; name: string; inches: stri
   scarf: { repeats: 4, name: 'Scarf', inches: '~12"' },
   kilt: { repeats: 6, name: 'Kilt Panel', inches: '~24"' },
   blanket: { repeats: 8, name: 'Blanket', inches: '~48"' },
+};
+
+// ============================================================================
+// CREST/MONOGRAM BUILDER TYPES
+// ============================================================================
+
+interface CrestConfig {
+  targetSize: number;  // Size in inches
+  threadGauge: number; // TPI for resolution calculation
+  backgroundColor: string;
+  foregroundColor: string;
+  technique: 'jacquard' | 'embroidery' | 'print';
+}
+
+// Resolution thresholds for different techniques
+const CREST_TECHNIQUES = {
+  jacquard: {
+    name: 'Jacquard Woven',
+    description: 'Woven directly into fabric - most authentic',
+    minTPI: 60,
+    maxTPI: 120,
+    minDetail: 1.5, // minimum inches for readable crest
+    warning: 'Jacquard weaving creates a pixelated look. Best for simple, bold designs.',
+    isTraditional: true,
+  },
+  embroidery: {
+    name: 'Embroidery',
+    description: 'Stitched on top of woven tartan - high detail',
+    minTPI: 200,
+    maxTPI: 1200,
+    minDetail: 0.5,
+    warning: 'Embroidery is added after weaving. Not part of the tartan pattern itself.',
+    isTraditional: false,
+  },
+  print: {
+    name: 'Digital Print',
+    description: 'Printed on fabric - photographic quality',
+    minTPI: 150,
+    maxTPI: 600,
+    minDetail: 0.25,
+    warning: 'Digital printing is not woven. Produces printed fabric, not tartan.',
+    isTraditional: false,
+  },
+};
+
+// Simple shapes for monograms
+const MONOGRAM_SHAPES = {
+  circle: { name: 'Circle', svg: (size: number) => `M ${size/2} 0 A ${size/2} ${size/2} 0 1 0 ${size/2} ${size} A ${size/2} ${size/2} 0 1 0 ${size/2} 0` },
+  diamond: { name: 'Diamond', svg: (size: number) => `M ${size/2} 0 L ${size} ${size/2} L ${size/2} ${size} L 0 ${size/2} Z` },
+  shield: { name: 'Shield', svg: (size: number) => `M ${size*0.1} ${size*0.1} L ${size*0.9} ${size*0.1} L ${size*0.9} ${size*0.5} Q ${size*0.9} ${size*0.9} ${size*0.5} ${size} Q ${size*0.1} ${size*0.9} ${size*0.1} ${size*0.5} Z` },
+  square: { name: 'Square', svg: (size: number) => `M 0 0 L ${size} 0 L ${size} ${size} L 0 ${size} Z` },
 };
 
 // ============================================================================
@@ -296,6 +347,56 @@ const COLOR_PRESETS: Record<string, { name: string; colors: string[]; descriptio
     colors: ['TN', 'CW', 'RU', 'OG', 'GY', 'LBR', 'MR'],
     description: 'Nostalgic faded colors',
     category: 'Theme'
+  },
+
+  // === NEON & FLUORESCENT ===
+  neonFull: {
+    name: 'Full Neon',
+    colors: ['NP', 'NY', 'NO', 'NG', 'NE', 'NC', 'NM', 'NV', 'NR', 'NL', 'NT', 'NS', 'NA', 'NW', 'UV'],
+    description: 'All 15 fluorescent colors',
+    category: 'Neon'
+  },
+  rave: {
+    name: 'Rave',
+    colors: ['NP', 'NC', 'NM', 'NG', 'NV', 'UV', 'K'],
+    description: 'UV-reactive blacklight glow',
+    category: 'Neon'
+  },
+  neonPop: {
+    name: 'Neon Pop',
+    colors: ['NP', 'NY', 'NC', 'NG', 'W', 'K'],
+    description: '80s pop art vibes',
+    category: 'Neon'
+  },
+  electricDream: {
+    name: 'Electric Dream',
+    colors: ['NE', 'NM', 'NC', 'NV', 'K', 'W'],
+    description: 'Synthwave/cyberpunk aesthetic',
+    category: 'Neon'
+  },
+  acidTrip: {
+    name: 'Acid Trip',
+    colors: ['NL', 'NG', 'NY', 'NP', 'NM', 'K'],
+    description: 'Psychedelic lime/green focus',
+    category: 'Neon'
+  },
+  tropicalNeon: {
+    name: 'Tropical Neon',
+    colors: ['NP', 'NO', 'NY', 'NT', 'NA', 'W'],
+    description: 'Miami Vice sunset vibes',
+    category: 'Neon'
+  },
+  blacklightGlow: {
+    name: 'Blacklight Glow',
+    colors: ['UV', 'NW', 'NC', 'NM', 'NG', 'K'],
+    description: 'Maximum UV reactivity',
+    category: 'Neon'
+  },
+  neonNoir: {
+    name: 'Neon Noir',
+    colors: ['NP', 'NE', 'K', 'DGY', 'CH'],
+    description: 'Dark cyberpunk with neon accents',
+    category: 'Neon'
   },
 };
 
@@ -562,6 +663,7 @@ function ConfigPanel({
     { name: 'Purples', codes: ['P', 'LP', 'DP', 'VI', 'LV'] },
     { name: 'Oranges', codes: ['O', 'LO', 'DO'] },
     { name: 'Pinks', codes: ['PK', 'LP2', 'DP2'] },
+    { name: 'Neons', codes: ['NP', 'NY', 'NO', 'NG', 'NE', 'NC', 'NM', 'NV', 'NR', 'NL', 'NT', 'NS', 'NA', 'NW', 'UV'] },
   ];
 
   const toggleColor = (code: string) => {
@@ -1822,6 +1924,367 @@ function TiledPreviewModal({
   );
 }
 
+function CrestBuilder({
+  onClose,
+  threadGauge
+}: {
+  onClose: () => void;
+  threadGauge: number;
+}) {
+  const [crestConfig, setCrestConfig] = useState<CrestConfig>({
+    targetSize: 2.5,
+    threadGauge,
+    backgroundColor: '#1a1a2e',
+    foregroundColor: '#d4af37',
+    technique: 'jacquard',
+  });
+  const [monogramText, setMonogramText] = useState('');
+  const [shape, setShape] = useState<keyof typeof MONOGRAM_SHAPES>('shield');
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  const technique = CREST_TECHNIQUES[crestConfig.technique];
+  const resolution = Math.round(crestConfig.targetSize * crestConfig.threadGauge);
+  const isDetailSufficient = crestConfig.targetSize >= technique.minDetail;
+
+  // Render the crest preview
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const previewCanvas = previewCanvasRef.current;
+    if (!canvas || !previewCanvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const previewCtx = previewCanvas.getContext('2d');
+    if (!ctx || !previewCtx) return;
+
+    // Set canvas size to resolution (simulating thread count)
+    const size = resolution;
+    canvas.width = size;
+    canvas.height = size;
+
+    // Clear and fill background
+    ctx.fillStyle = crestConfig.backgroundColor;
+    ctx.fillRect(0, 0, size, size);
+
+    // Draw shape
+    ctx.fillStyle = crestConfig.foregroundColor;
+
+    if (uploadedImage) {
+      // Draw uploaded image
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, size, size);
+        updatePreview();
+      };
+      img.src = uploadedImage;
+    } else if (monogramText) {
+      // Draw text monogram
+      const fontSize = Math.floor(size * 0.6);
+      ctx.font = `bold ${fontSize}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(monogramText.toUpperCase().slice(0, 3), size / 2, size / 2);
+      updatePreview();
+    } else {
+      // Draw shape outline
+      const shapePath = MONOGRAM_SHAPES[shape];
+      const path = new Path2D(shapePath.svg(size * 0.8));
+      ctx.save();
+      ctx.translate(size * 0.1, size * 0.1);
+      ctx.fill(path);
+      ctx.restore();
+      updatePreview();
+    }
+
+    function updatePreview() {
+      if (!previewCanvas || !previewCtx || !canvas) return;
+      // Scale up for preview display
+      const previewSize = 280;
+      previewCanvas.width = previewSize;
+      previewCanvas.height = previewSize;
+      previewCtx.imageSmoothingEnabled = false; // Keep pixelated look
+      previewCtx.drawImage(canvas, 0, 0, previewSize, previewSize);
+    }
+  }, [crestConfig, monogramText, shape, uploadedImage, resolution]);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setUploadedImage(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDownloadPixelMap = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `crest-${resolution}x${resolution}-jacquard.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+      <div className="bg-gray-900 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-gray-900 border-b border-gray-800 p-4 flex items-center justify-between z-10">
+          <div>
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              Crest & Monogram Builder
+              {!technique.isTraditional && (
+                <span className="text-xs px-2 py-0.5 bg-amber-900/50 text-amber-300 rounded-full">
+                  Beyond Traditional Tartan
+                </span>
+              )}
+            </h2>
+            <p className="text-sm text-gray-400">Design embroidered or woven emblems for your tartan</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-800 rounded-lg transition-colors">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="p-6 grid md:grid-cols-2 gap-6">
+          {/* Configuration Panel */}
+          <div className="space-y-6">
+            {/* Technique Selection */}
+            <div>
+              <label className="label">Production Technique</label>
+              <div className="grid grid-cols-1 gap-2">
+                {(Object.entries(CREST_TECHNIQUES) as [keyof typeof CREST_TECHNIQUES, typeof CREST_TECHNIQUES.jacquard][]).map(([key, tech]) => (
+                  <button
+                    key={key}
+                    onClick={() => setCrestConfig({ ...crestConfig, technique: key })}
+                    className={`p-3 rounded-lg text-left transition-all ${
+                      crestConfig.technique === key
+                        ? tech.isTraditional
+                          ? 'bg-emerald-900/50 border-2 border-emerald-500'
+                          : 'bg-amber-900/50 border-2 border-amber-500'
+                        : 'bg-gray-800 border-2 border-transparent hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{tech.name}</span>
+                      {tech.isTraditional ? (
+                        <span className="text-xs px-2 py-0.5 bg-emerald-900/50 text-emerald-300 rounded-full">Traditional</span>
+                      ) : (
+                        <span className="text-xs px-2 py-0.5 bg-amber-900/50 text-amber-300 rounded-full">Modern</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">{tech.description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Size Configuration */}
+            <div>
+              <label className="label">Target Size: {crestConfig.targetSize}" × {crestConfig.targetSize}"</label>
+              <input
+                type="range"
+                min="0.5"
+                max="6"
+                step="0.25"
+                value={crestConfig.targetSize}
+                onChange={(e) => setCrestConfig({ ...crestConfig, targetSize: parseFloat(e.target.value) })}
+                className="slider w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>0.5" (Tie Pin)</span>
+                <span>3" (Badge)</span>
+                <span>6" (Patch)</span>
+              </div>
+            </div>
+
+            {/* Thread Gauge */}
+            <div>
+              <label className="label">Thread Gauge: {crestConfig.threadGauge} TPI</label>
+              <input
+                type="range"
+                min="24"
+                max="120"
+                step="4"
+                value={crestConfig.threadGauge}
+                onChange={(e) => setCrestConfig({ ...crestConfig, threadGauge: parseInt(e.target.value) })}
+                className="slider w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>24 (Coarse)</span>
+                <span>72 (Standard)</span>
+                <span>120 (Fine)</span>
+              </div>
+            </div>
+
+            {/* Resolution Info */}
+            <div className={`p-4 rounded-lg ${isDetailSufficient ? 'bg-emerald-900/30 border border-emerald-800' : 'bg-amber-900/30 border border-amber-800'}`}>
+              <div className="text-sm font-medium mb-2">
+                Resolution: {resolution} × {resolution} threads
+              </div>
+              <p className="text-xs text-gray-400">
+                {isDetailSufficient
+                  ? `At ${crestConfig.targetSize}" with ${crestConfig.threadGauge} TPI, your crest will have sufficient detail for ${technique.name.toLowerCase()}.`
+                  : `Warning: ${crestConfig.targetSize}" is below the ${technique.minDetail}" minimum for readable detail with ${technique.name.toLowerCase()}. Consider increasing size.`
+                }
+              </p>
+            </div>
+
+            {/* Monogram Input */}
+            <div>
+              <label className="label">Monogram Text (1-3 letters)</label>
+              <input
+                type="text"
+                maxLength={3}
+                value={monogramText}
+                onChange={(e) => { setMonogramText(e.target.value); setUploadedImage(null); }}
+                placeholder="e.g., DJM"
+                className="input"
+              />
+            </div>
+
+            {/* Shape Selection */}
+            <div>
+              <label className="label">Shape Frame</label>
+              <div className="grid grid-cols-4 gap-2">
+                {(Object.entries(MONOGRAM_SHAPES) as [keyof typeof MONOGRAM_SHAPES, { name: string }][]).map(([key, shapeData]) => (
+                  <button
+                    key={key}
+                    onClick={() => setShape(key)}
+                    className={`p-2 rounded-lg text-center text-sm transition-all ${
+                      shape === key
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    }`}
+                  >
+                    {shapeData.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Image Upload */}
+            <div>
+              <label className="label">Or Upload Image</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
+              />
+              {uploadedImage && (
+                <button
+                  onClick={() => setUploadedImage(null)}
+                  className="text-xs text-red-400 hover:text-red-300 mt-2"
+                >
+                  Clear uploaded image
+                </button>
+              )}
+            </div>
+
+            {/* Colors */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">Background</label>
+                <input
+                  type="color"
+                  value={crestConfig.backgroundColor}
+                  onChange={(e) => setCrestConfig({ ...crestConfig, backgroundColor: e.target.value })}
+                  className="w-full h-10 rounded-lg cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="label">Foreground</label>
+                <input
+                  type="color"
+                  value={crestConfig.foregroundColor}
+                  onChange={(e) => setCrestConfig({ ...crestConfig, foregroundColor: e.target.value })}
+                  className="w-full h-10 rounded-lg cursor-pointer"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Preview Panel */}
+          <div className="space-y-4">
+            <div className="bg-gray-800 rounded-lg p-4">
+              <h3 className="text-sm font-medium text-gray-300 mb-3">Pixel Preview (Actual Resolution)</h3>
+              <div className="flex justify-center">
+                <canvas
+                  ref={previewCanvasRef}
+                  className="rounded-lg border border-gray-700"
+                  style={{ imageRendering: 'pixelated' }}
+                />
+              </div>
+              <p className="text-center text-xs text-gray-500 mt-2">
+                This is how your crest will look at {resolution}×{resolution} threads
+              </p>
+            </div>
+
+            {/* Hidden actual-resolution canvas */}
+            <canvas ref={canvasRef} className="hidden" />
+
+            {/* Warning for technique */}
+            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <h4 className="text-sm font-medium text-amber-400 mb-2">Production Note</h4>
+              <p className="text-xs text-gray-400">{technique.warning}</p>
+            </div>
+
+            {/* Manufacturer recommendations */}
+            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <h4 className="text-sm font-medium text-gray-300 mb-2">Recommended Manufacturers</h4>
+              <ul className="text-xs text-gray-400 space-y-1">
+                {crestConfig.technique === 'jacquard' && (
+                  <>
+                    <li>• <strong>Lochcarron of Scotland</strong> - Traditional jacquard weaving</li>
+                    <li>• <strong>House of Edgar</strong> - Custom figured tartan</li>
+                  </>
+                )}
+                {crestConfig.technique === 'embroidery' && (
+                  <>
+                    <li>• <strong>Hand & Lock</strong> - Luxury embroidery (London)</li>
+                    <li>• <strong>Coats & Clark</strong> - Industrial embroidery</li>
+                  </>
+                )}
+                {crestConfig.technique === 'print' && (
+                  <>
+                    <li>• <strong>Printful</strong> - On-demand fabric printing</li>
+                    <li>• <strong>Spoonflower</strong> - Custom fabric printing</li>
+                  </>
+                )}
+              </ul>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={handleDownloadPixelMap}
+                className="btn-primary flex-1"
+              >
+                Download Pixel Map
+              </button>
+              <button onClick={onClose} className="btn-secondary flex-1">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function YarnCalculatorModal({
   data,
   config,
@@ -2536,6 +2999,7 @@ export default function App() {
   const [yarnCalcData, setYarnCalcData] = useState<TartanCardData | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [showColorBuilder, setShowColorBuilder] = useState(false);
+  const [showCrestBuilder, setShowCrestBuilder] = useState(false);
   const [customColors, setCustomColors] = useState<CustomColor[]>(() => {
     const saved = localStorage.getItem('tartanism-custom-colors');
     return saved ? JSON.parse(saved) : [];
@@ -2765,6 +3229,12 @@ export default function App() {
             >
               Builder
             </button>
+            <button
+              onClick={() => setShowCrestBuilder(true)}
+              className="px-4 py-2 rounded-lg text-gray-400 hover:text-white transition-colors"
+            >
+              Crests
+            </button>
             {tartans.length > 0 && (
               <button onClick={handleExportCSV} className="btn-secondary text-sm">
                 Export CSV
@@ -2876,6 +3346,13 @@ export default function App() {
         <YarnColorBuilder
           onClose={() => setShowColorBuilder(false)}
           onColorsChange={(colors) => setCustomColors(colors)}
+        />
+      )}
+
+      {showCrestBuilder && (
+        <CrestBuilder
+          onClose={() => setShowCrestBuilder(false)}
+          threadGauge={config.threadGauge}
         />
       )}
     </div>
