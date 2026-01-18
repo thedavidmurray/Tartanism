@@ -708,12 +708,13 @@ function TartanCard({
       <div className="flex items-start justify-between">
         <div className="flex flex-wrap gap-1">
           {!imagePattern && sett.colors.map(code => <ColorChip key={code} code={code} />)}
-          {imagePattern && data.id.startsWith('motif-') && <span className="text-xs text-gray-400">{data.result.signature.signature}</span>}
-          {imagePattern && !data.id.startsWith('motif-') && <span className="text-xs text-gray-400">Image Pattern</span>}
+          {imagePattern && (data.id.startsWith('motif-') || data.id.startsWith('geo-')) && <span className="text-xs text-gray-400">{data.result.signature.signature}</span>}
+          {imagePattern && data.id.startsWith('img-') && <span className="text-xs text-gray-400">Image Pattern</span>}
         </div>
         <div className="flex gap-1">
           {imagePattern && data.id.startsWith('motif-') && <span className="text-xs px-2 py-0.5 bg-amber-900/50 text-amber-300 rounded-full">Motif</span>}
-          {imagePattern && !data.id.startsWith('motif-') && <span className="text-xs px-2 py-0.5 bg-cyan-900/50 text-cyan-300 rounded-full">Image</span>}
+          {imagePattern && data.id.startsWith('geo-') && <span className="text-xs px-2 py-0.5 bg-teal-900/50 text-teal-300 rounded-full">Geometric</span>}
+          {imagePattern && data.id.startsWith('img-') && <span className="text-xs px-2 py-0.5 bg-cyan-900/50 text-cyan-300 rounded-full">Image</span>}
           {isBlanket && <span className="text-xs px-2 py-0.5 bg-orange-900/50 text-orange-300 rounded-full">Blanket</span>}
           {isOptical && <span className="text-xs px-2 py-0.5 bg-purple-900/50 text-purple-300 rounded-full">Optical</span>}
           {parentId && <span className="text-xs px-2 py-0.5 bg-green-900/50 text-green-300 rounded-full">Mutant</span>}
@@ -3399,7 +3400,7 @@ function GeometricPatternBuilder({
   onCreatePattern,
 }: {
   onClose: () => void;
-  onCreatePattern: (threadcount: string) => void;
+  onCreatePattern: (imageData: string, patternName: string) => void;
 }) {
   const [patternType, setPatternType] = useState<GeometricPatternType>('stripes');
   const [colorPalette, setColorPalette] = useState<string>('Chief Joseph');
@@ -3651,10 +3652,22 @@ function GeometricPatternBuilder({
   }, [patternType, colorPalette, complexity, symmetry, colors, generatePattern]);
 
   const handleCreate = () => {
-    if (generatedThreadcount) {
-      onCreatePattern(generatedThreadcount);
-      onClose();
-    }
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return;
+
+    // Get the pattern name from the selected type
+    const patternNames: Record<GeometricPatternType, string> = {
+      stripes: 'Blanket Stripes',
+      diamonds: 'Diamond Pattern',
+      chevron: 'Chevron Pattern',
+      steps: 'Step Pattern',
+      arrows: 'Arrow Pattern',
+      zigzag: 'Zigzag Pattern',
+      bands: 'Band Pattern',
+    };
+
+    onCreatePattern(canvas.toDataURL(), `${patternNames[patternType]} (${colorPalette})`);
+    onClose();
   };
 
   return (
@@ -6103,23 +6116,27 @@ export default function App() {
     localStorage.setItem('tartanism-custom-colors', JSON.stringify(updatedColors));
   }, [customColors]);
 
-  const handleCreateGeometricPattern = useCallback((threadcount: string) => {
-    const parsed = parseThreadcount(threadcount);
-    if (!parsed || parsed.stripes.length === 0) return;
+  const handleCreateGeometricPattern = useCallback((imageData: string, patternName: string) => {
+    // Geometric patterns now export as canvas images (like illustrated motifs)
+    const placeholderSett = parseThreadcount('K/8 W8');
+    if (!placeholderSett) return;
 
-    const newTartan: TartanCardData = {
+    const newPattern: TartanCardData = {
       id: `geo-${Date.now()}`,
       result: {
-        sett: parsed,
+        sett: placeholderSett,
         seed: Date.now(),
         constraints: DEFAULT_CONSTRAINTS,
-        signature: { signature: '', structureSignature: '', proportionSignature: '' }
+        signature: { signature: patternName, structureSignature: '', proportionSignature: '' }
       },
-      isOptical: config.opticalMode,
-      isBlanket: true,  // Geometric patterns render as solid stripes (Pendleton-style)
+      imagePattern: {
+        imageData,
+        repeatMode: 'normal',
+        pixelSize: 1,
+      },
     };
 
-    setTartans(prev => [newTartan, ...prev]);
+    setTartans(prev => [newPattern, ...prev]);
     setShowGeometricBuilder(false);
   }, [config.opticalMode]);
 
@@ -6347,9 +6364,9 @@ export default function App() {
   }, [tartans]);
 
   return (
-    <div className="min-h-screen bg-gray-950">
+    <div className="h-screen flex flex-col bg-gray-950 overflow-hidden">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-950/80 backdrop-blur sticky top-0 z-40">
+      <header className="flex-shrink-0 border-b border-gray-800 bg-gray-950/80 backdrop-blur z-40">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
@@ -6450,11 +6467,11 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-[320px_1fr] gap-8">
-          {/* Config Panel */}
-          <aside className="lg:sticky lg:top-24 lg:h-fit">
+      {/* Main Content - Fixed height with independent scroll areas */}
+      <main className="flex-1 overflow-hidden">
+        <div className="h-full max-w-7xl mx-auto px-4 py-4 grid lg:grid-cols-[320px_1fr] gap-6">
+          {/* Config Panel - Independent scroll */}
+          <aside className="overflow-y-auto pr-2 scrollbar-thin">
             <ConfigPanel
               config={config}
               onChange={setConfig}
@@ -6464,8 +6481,8 @@ export default function App() {
             />
           </aside>
 
-          {/* Results Grid */}
-          <section>
+          {/* Results Grid - Independent scroll */}
+          <section className="overflow-y-auto pl-2 scrollbar-thin">
             {/* Breeding Panel */}
             {breedingMode && (
               <div className="mb-6 p-4 bg-gradient-to-r from-pink-900/30 to-purple-900/30 rounded-xl border border-pink-800/50">
