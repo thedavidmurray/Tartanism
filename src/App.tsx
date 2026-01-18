@@ -928,6 +928,13 @@ function ConfigPanel({
   );
 }
 
+type PatternMode = 'stripe' | 'grid';
+
+interface GridCell {
+  warpColor: string;
+  weftColor: string;
+}
+
 function PatternBuilder({
   initialSett,
   config,
@@ -941,6 +948,7 @@ function PatternBuilder({
   onSave: (sett: Sett) => void;
   onClose: () => void;
 }) {
+  const [mode, setMode] = useState<PatternMode>('stripe');
   const [stripes, setStripes] = useState<ThreadStripe[]>(
     initialSett?.stripes || [
       { color: 'B', count: 24, isPivot: true },
@@ -952,6 +960,25 @@ function PatternBuilder({
   );
   const [selectedStripe, setSelectedStripe] = useState<number | null>(null);
   const [patternName, setPatternName] = useState(initialSett?.name || '');
+
+  // Grid mode state - separate warp (vertical) and weft (horizontal) sequences
+  const [warpSequence, setWarpSequence] = useState<ThreadStripe[]>(
+    initialSett?.stripes || [
+      { color: 'B', count: 8 },
+      { color: 'W', count: 2 },
+      { color: 'G', count: 8 },
+    ]
+  );
+  const [weftSequence, setWeftSequence] = useState<ThreadStripe[]>(
+    initialSett?.stripes || [
+      { color: 'B', count: 8 },
+      { color: 'W', count: 2 },
+      { color: 'G', count: 8 },
+    ]
+  );
+  const [syncWarpWeft, setSyncWarpWeft] = useState(true); // Traditional tartan = same warp/weft
+  const [gridScale, setGridScale] = useState(4); // Pixels per thread in grid view
+  const [selectedAxis, setSelectedAxis] = useState<'warp' | 'weft'>('warp');
 
   const currentSett = parseThreadcount(stripes.map(s => `${s.color}${s.isPivot ? '/' : ''}${s.count}`).join(' '));
 
@@ -995,139 +1022,454 @@ function PatternBuilder({
     return customColor?.hex || '#808080';
   };
 
+  // Grid mode helpers
+  const expandSequenceToThreads = (sequence: ThreadStripe[]): string[] => {
+    const threads: string[] = [];
+    sequence.forEach(stripe => {
+      for (let i = 0; i < stripe.count; i++) {
+        threads.push(stripe.color);
+      }
+    });
+    return threads;
+  };
+
+  const warpThreads = expandSequenceToThreads(warpSequence);
+  const weftThreads = expandSequenceToThreads(weftSequence);
+
+  // Calculate grid sett for preview
+  const gridSett = mode === 'grid'
+    ? parseThreadcount(warpSequence.map(s => `${s.color}${s.count}`).join(' '))
+    : currentSett;
+
+  // Add stripe to grid sequence
+  const addGridStripe = (axis: 'warp' | 'weft') => {
+    const sequence = axis === 'warp' ? warpSequence : weftSequence;
+    const setSequence = axis === 'warp' ? setWarpSequence : setWeftSequence;
+    const lastColor = sequence[sequence.length - 1]?.color || 'B';
+    const allColors = [...Object.keys(TARTAN_COLORS), ...customColors.map(c => c.code)];
+    const newColor = allColors.find(c => c !== lastColor) || 'B';
+    const newSequence = [...sequence, { color: newColor, count: 4 }];
+    setSequence(newSequence);
+    if (syncWarpWeft) {
+      if (axis === 'warp') setWeftSequence(newSequence);
+      else setWarpSequence(newSequence);
+    }
+  };
+
+  const removeGridStripe = (axis: 'warp' | 'weft', index: number) => {
+    const sequence = axis === 'warp' ? warpSequence : weftSequence;
+    const setSequence = axis === 'warp' ? setWarpSequence : setWeftSequence;
+    if (sequence.length <= 1) return;
+    const newSequence = sequence.filter((_, i) => i !== index);
+    setSequence(newSequence);
+    if (syncWarpWeft) {
+      if (axis === 'warp') setWeftSequence(newSequence);
+      else setWarpSequence(newSequence);
+    }
+  };
+
+  const updateGridStripe = (axis: 'warp' | 'weft', index: number, updates: Partial<ThreadStripe>) => {
+    const sequence = axis === 'warp' ? warpSequence : weftSequence;
+    const setSequence = axis === 'warp' ? setWarpSequence : setWeftSequence;
+    const newSequence = sequence.map((s, i) => i === index ? { ...s, ...updates } : s);
+    setSequence(newSequence);
+    if (syncWarpWeft) {
+      if (axis === 'warp') setWeftSequence(newSequence);
+      else setWarpSequence(newSequence);
+    }
+  };
+
+  // Sync stripe mode to grid mode when switching
+  const handleModeSwitch = (newMode: PatternMode) => {
+    if (newMode === 'grid' && mode === 'stripe') {
+      // Convert stripe mode to grid mode
+      setWarpSequence([...stripes]);
+      setWeftSequence([...stripes]);
+    } else if (newMode === 'stripe' && mode === 'grid') {
+      // Convert grid mode back to stripe mode (use warp as primary)
+      setStripes([...warpSequence]);
+    }
+    setMode(newMode);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="card max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Pattern Builder</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
+      <div className="card max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="p-4 border-b border-gray-800">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xl font-semibold">Pattern Builder</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
+          </div>
+
+          {/* Mode Toggle */}
+          <div className="flex items-center gap-4">
+            <div className="flex bg-gray-800 rounded-lg p-1">
+              <button
+                onClick={() => handleModeSwitch('stripe')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  mode === 'stripe' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Stripe Mode
+              </button>
+              <button
+                onClick={() => handleModeSwitch('grid')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  mode === 'grid' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Grid Mode
+              </button>
+            </div>
+            <span className="text-xs text-gray-500">
+              {mode === 'stripe' ? 'Simple sequential stripe editor' : 'Advanced warp/weft control'}
+            </span>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 grid lg:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div>
-              <label className="label">Pattern Name</label>
-              <input
-                type="text"
-                value={patternName}
-                onChange={e => setPatternName(e.target.value)}
-                placeholder="My Custom Tartan"
-                className="input"
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="label mb-0">Stripes</label>
-                <button onClick={addStripe} className="btn-secondary text-xs">+ Add Stripe</button>
-              </div>
-
-              <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
-                {stripes.map((stripe, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
-                      selectedStripe === index ? 'bg-indigo-900/30 ring-1 ring-indigo-500' : 'bg-gray-800/50'
-                    }`}
-                    onClick={() => setSelectedStripe(index)}
-                  >
-                    <div
-                      className="w-8 h-8 rounded border border-gray-600 flex-shrink-0"
-                      style={{ backgroundColor: getColorHex(stripe.color) }}
-                    />
-
-                    <select
-                      value={stripe.color}
-                      onChange={e => updateStripe(index, { color: e.target.value })}
-                      className="input flex-1 py-1 text-sm"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <optgroup label="Standard Colors">
-                        {Object.entries(TARTAN_COLORS).map(([code, color]) => (
-                          <option key={code} value={code}>{color.name} ({code})</option>
-                        ))}
-                      </optgroup>
-                      {customColors.length > 0 && (
-                        <optgroup label="Custom Colors">
-                          {customColors.map(cc => (
-                            <option key={cc.code} value={cc.code}>{cc.name} ({cc.code})</option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </select>
-
-                    <input
-                      type="number"
-                      min="2"
-                      max="48"
-                      step="2"
-                      value={stripe.count}
-                      onChange={e => updateStripe(index, { count: Math.max(2, parseInt(e.target.value) || 2) })}
-                      className="input w-16 py-1 text-sm text-center"
-                      onClick={e => e.stopPropagation()}
-                    />
-
-                    <button
-                      onClick={e => { e.stopPropagation(); moveStripe(index, -1); }}
-                      disabled={index === 0}
-                      className="p-1 text-gray-400 hover:text-white disabled:opacity-30"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); moveStripe(index, 1); }}
-                      disabled={index === stripes.length - 1}
-                      className="p-1 text-gray-400 hover:text-white disabled:opacity-30"
-                    >
-                      ↓
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); duplicateStripe(index); }}
-                      className="p-1 text-gray-400 hover:text-white"
-                    >
-                      ⧉
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); removeStripe(index); }}
-                      disabled={stripes.length <= 2}
-                      className="p-1 text-red-400 hover:text-red-300 disabled:opacity-30"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="text-sm text-gray-400 space-y-1">
-              <div>Total: {currentSett.totalThreads} threads</div>
-              <div>Sett size: {(expandSett(currentSett).length / config.threadGauge).toFixed(2)}"</div>
-              <div>Colors: {currentSett.colors.length}</div>
-            </div>
-
-            <div className="font-mono text-xs text-gray-500 p-2 bg-gray-900 rounded">
-              {currentSett.threadcount}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <label className="label">Preview</label>
-            <TartanCanvas
-              sett={currentSett}
-              weaveType={config.weaveType}
-              scale={3}
-              repeats={2}
-              customColors={customColors}
-              className="w-full aspect-square rounded-lg"
+        <div className="flex-1 overflow-y-auto p-4">
+          {/* Pattern Name - shared between modes */}
+          <div className="mb-4">
+            <label className="label">Pattern Name</label>
+            <input
+              type="text"
+              value={patternName}
+              onChange={e => setPatternName(e.target.value)}
+              placeholder="My Custom Tartan"
+              className="input"
             />
           </div>
+
+          {mode === 'stripe' ? (
+            /* ==================== STRIPE MODE ==================== */
+            <div className="grid lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="label mb-0">Stripes</label>
+                    <button onClick={addStripe} className="btn-secondary text-xs">+ Add Stripe</button>
+                  </div>
+
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
+                    {stripes.map((stripe, index) => (
+                      <div
+                        key={index}
+                        className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+                          selectedStripe === index ? 'bg-indigo-900/30 ring-1 ring-indigo-500' : 'bg-gray-800/50'
+                        }`}
+                        onClick={() => setSelectedStripe(index)}
+                      >
+                        <div
+                          className="w-8 h-8 rounded border border-gray-600 flex-shrink-0"
+                          style={{ backgroundColor: getColorHex(stripe.color) }}
+                        />
+
+                        <select
+                          value={stripe.color}
+                          onChange={e => updateStripe(index, { color: e.target.value })}
+                          className="input flex-1 py-1 text-sm"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <optgroup label="Standard Colors">
+                            {Object.entries(TARTAN_COLORS).map(([code, color]) => (
+                              <option key={code} value={code}>{color.name} ({code})</option>
+                            ))}
+                          </optgroup>
+                          {customColors.length > 0 && (
+                            <optgroup label="Custom Colors">
+                              {customColors.map(cc => (
+                                <option key={cc.code} value={cc.code}>{cc.name} ({cc.code})</option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </select>
+
+                        <input
+                          type="number"
+                          min="2"
+                          max="48"
+                          step="2"
+                          value={stripe.count}
+                          onChange={e => updateStripe(index, { count: Math.max(2, parseInt(e.target.value) || 2) })}
+                          className="input w-16 py-1 text-sm text-center"
+                          onClick={e => e.stopPropagation()}
+                        />
+
+                        <button
+                          onClick={e => { e.stopPropagation(); moveStripe(index, -1); }}
+                          disabled={index === 0}
+                          className="p-1 text-gray-400 hover:text-white disabled:opacity-30"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); moveStripe(index, 1); }}
+                          disabled={index === stripes.length - 1}
+                          className="p-1 text-gray-400 hover:text-white disabled:opacity-30"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); duplicateStripe(index); }}
+                          className="p-1 text-gray-400 hover:text-white"
+                        >
+                          ⧉
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); removeStripe(index); }}
+                          disabled={stripes.length <= 2}
+                          className="p-1 text-red-400 hover:text-red-300 disabled:opacity-30"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="text-sm text-gray-400 space-y-1">
+                  <div>Total: {currentSett.totalThreads} threads</div>
+                  <div>Sett size: {(expandSett(currentSett).length / config.threadGauge).toFixed(2)}"</div>
+                  <div>Colors: {currentSett.colors.length}</div>
+                </div>
+
+                <div className="font-mono text-xs text-gray-500 p-2 bg-gray-900 rounded">
+                  {currentSett.threadcount}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="label">Preview</label>
+                <TartanCanvas
+                  sett={currentSett}
+                  weaveType={config.weaveType}
+                  scale={3}
+                  repeats={2}
+                  customColors={customColors}
+                  className="w-full aspect-square rounded-lg"
+                />
+              </div>
+            </div>
+          ) : (
+            /* ==================== GRID MODE ==================== */
+            <div className="space-y-4">
+              {/* Sync Toggle */}
+              <div className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={syncWarpWeft}
+                    onChange={e => setSyncWarpWeft(e.target.checked)}
+                    className="rounded border-gray-600 bg-gray-700 text-indigo-500 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm text-gray-300">Sync Warp & Weft (Traditional Tartan)</span>
+                </label>
+                <span className="text-xs text-gray-500">
+                  {syncWarpWeft ? 'Same pattern on both axes' : 'Independent warp/weft control'}
+                </span>
+              </div>
+
+              <div className="grid lg:grid-cols-3 gap-4">
+                {/* Warp Sequence (Vertical/Y-axis) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="label mb-0 flex items-center gap-2">
+                      <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
+                      Warp (Vertical)
+                    </label>
+                    <button onClick={() => addGridStripe('warp')} className="btn-secondary text-xs">+</button>
+                  </div>
+                  <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
+                    {warpSequence.map((stripe, index) => (
+                      <div key={index} className="flex items-center gap-1 p-1.5 bg-gray-800/50 rounded">
+                        <div
+                          className="w-6 h-6 rounded border border-gray-600 flex-shrink-0"
+                          style={{ backgroundColor: getColorHex(stripe.color) }}
+                        />
+                        <select
+                          value={stripe.color}
+                          onChange={e => updateGridStripe('warp', index, { color: e.target.value })}
+                          className="input flex-1 py-0.5 text-xs"
+                        >
+                          <optgroup label="Standard">
+                            {Object.entries(TARTAN_COLORS).map(([code, color]) => (
+                              <option key={code} value={code}>{code}</option>
+                            ))}
+                          </optgroup>
+                          {customColors.length > 0 && (
+                            <optgroup label="Custom">
+                              {customColors.map(cc => (
+                                <option key={cc.code} value={cc.code}>{cc.code}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </select>
+                        <input
+                          type="number"
+                          min="1"
+                          max="32"
+                          value={stripe.count}
+                          onChange={e => updateGridStripe('warp', index, { count: Math.max(1, parseInt(e.target.value) || 1) })}
+                          className="input w-12 py-0.5 text-xs text-center"
+                        />
+                        <button
+                          onClick={() => removeGridStripe('warp', index)}
+                          disabled={warpSequence.length <= 1}
+                          className="p-0.5 text-red-400 hover:text-red-300 disabled:opacity-30 text-xs"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-xs text-gray-500">{warpThreads.length} threads</div>
+                </div>
+
+                {/* Weft Sequence (Horizontal/X-axis) - Only visible when not synced */}
+                <div className={`space-y-2 ${syncWarpWeft ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <div className="flex items-center justify-between">
+                    <label className="label mb-0 flex items-center gap-2">
+                      <span className="w-3 h-3 bg-orange-500 rounded-full"></span>
+                      Weft (Horizontal)
+                    </label>
+                    <button onClick={() => addGridStripe('weft')} className="btn-secondary text-xs">+</button>
+                  </div>
+                  <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
+                    {weftSequence.map((stripe, index) => (
+                      <div key={index} className="flex items-center gap-1 p-1.5 bg-gray-800/50 rounded">
+                        <div
+                          className="w-6 h-6 rounded border border-gray-600 flex-shrink-0"
+                          style={{ backgroundColor: getColorHex(stripe.color) }}
+                        />
+                        <select
+                          value={stripe.color}
+                          onChange={e => updateGridStripe('weft', index, { color: e.target.value })}
+                          className="input flex-1 py-0.5 text-xs"
+                        >
+                          <optgroup label="Standard">
+                            {Object.entries(TARTAN_COLORS).map(([code, color]) => (
+                              <option key={code} value={code}>{code}</option>
+                            ))}
+                          </optgroup>
+                          {customColors.length > 0 && (
+                            <optgroup label="Custom">
+                              {customColors.map(cc => (
+                                <option key={cc.code} value={cc.code}>{cc.code}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </select>
+                        <input
+                          type="number"
+                          min="1"
+                          max="32"
+                          value={stripe.count}
+                          onChange={e => updateGridStripe('weft', index, { count: Math.max(1, parseInt(e.target.value) || 1) })}
+                          className="input w-12 py-0.5 text-xs text-center"
+                        />
+                        <button
+                          onClick={() => removeGridStripe('weft', index)}
+                          disabled={weftSequence.length <= 1}
+                          className="p-0.5 text-red-400 hover:text-red-300 disabled:opacity-30 text-xs"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-xs text-gray-500">{weftThreads.length} threads</div>
+                </div>
+
+                {/* Grid Preview */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="label mb-0">Weave Grid</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">Scale:</span>
+                      <input
+                        type="range"
+                        min="2"
+                        max="8"
+                        value={gridScale}
+                        onChange={e => setGridScale(parseInt(e.target.value))}
+                        className="w-16"
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-gray-900 rounded-lg p-2 overflow-auto max-h-64">
+                    <div
+                      className="grid gap-0"
+                      style={{
+                        gridTemplateColumns: `repeat(${Math.min(weftThreads.length, 40)}, ${gridScale}px)`,
+                        width: 'fit-content'
+                      }}
+                    >
+                      {Array.from({ length: Math.min(warpThreads.length, 40) }).map((_, y) =>
+                        Array.from({ length: Math.min(weftThreads.length, 40) }).map((_, x) => {
+                          const warpColor = warpThreads[y];
+                          const weftColor = weftThreads[x];
+                          // Simple weave: alternate warp/weft showing based on position
+                          const showWarp = (x + y) % 2 === 0;
+                          const displayColor = showWarp ? warpColor : weftColor;
+                          return (
+                            <div
+                              key={`${x}-${y}`}
+                              className="border border-gray-800/50"
+                              style={{
+                                width: gridScale,
+                                height: gridScale,
+                                backgroundColor: getColorHex(displayColor)
+                              }}
+                              title={`Warp: ${warpColor}, Weft: ${weftColor}`}
+                            />
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {Math.min(warpThreads.length, 40)}×{Math.min(weftThreads.length, 40)} threads shown
+                    {(warpThreads.length > 40 || weftThreads.length > 40) && ' (truncated)'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Full Preview */}
+              <div className="grid lg:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="label">Threadcount</label>
+                  <div className="font-mono text-xs text-gray-500 p-2 bg-gray-900 rounded">
+                    Warp: {warpSequence.map(s => `${s.color}${s.count}`).join(' ')}
+                  </div>
+                  {!syncWarpWeft && (
+                    <div className="font-mono text-xs text-gray-500 p-2 bg-gray-900 rounded mt-1">
+                      Weft: {weftSequence.map(s => `${s.color}${s.count}`).join(' ')}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="label">Full Preview</label>
+                  <TartanCanvas
+                    sett={gridSett}
+                    weaveType={config.weaveType}
+                    scale={3}
+                    repeats={2}
+                    customColors={customColors}
+                    className="w-full aspect-square rounded-lg max-w-[200px]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-4 border-t border-gray-800 flex gap-3 justify-end">
           <button onClick={onClose} className="btn-secondary">Cancel</button>
           <button
             onClick={() => {
-              const sett = { ...currentSett, name: patternName || undefined };
+              const sett = mode === 'stripe'
+                ? { ...currentSett, name: patternName || undefined }
+                : { ...gridSett, name: patternName || undefined };
               onSave(sett);
             }}
             className="btn-primary"
