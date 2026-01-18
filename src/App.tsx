@@ -35,7 +35,24 @@ interface GeneratorConfig {
   opticalMode: boolean;
   shapeMask: ShapeMaskOptions;
   allowedColors: string[];
+  loomCompatible: boolean;
 }
+
+// Lochcarron production constraints
+const LOOM_CONSTRAINTS = {
+  maxColors: 6,
+  weaveType: 'twill-2-2' as WeaveType,
+  fabrics: [
+    { code: 'CTRV', name: 'Reiver™', weight: '10oz', width: '59"', use: 'Jackets, ties, dresses' },
+    { code: 'CTBR', name: 'Braeriach™', weight: '13oz', width: '54"', use: 'Kilts, trews, bags' },
+    { code: 'CTST', name: 'Strome™', weight: '16oz', width: '54"', use: 'Heavy kilts, upholstery' },
+  ],
+  accessories: [
+    { code: 'ABSCL', name: 'Bowhill Scarf', material: 'Lambswool', size: '24×180cm' },
+    { code: 'ABSQL', name: 'Darwin Scarf', material: 'Lambswool', size: '35×200cm' },
+    { code: 'ABRG', name: 'Borders Blanket', material: 'Lambswool', size: '140×180cm' },
+  ],
+};
 
 type ViewMode = 'generator' | 'builder';
 
@@ -595,12 +612,15 @@ function ConfigPanel({
       </div>
 
       <div>
-        <label className="label">Colors ({config.colorMin} - {config.colorMax})</label>
+        <label className="label">
+          Colors ({config.colorMin} - {config.colorMax})
+          {config.loomCompatible && <span className="text-amber-400 text-xs ml-2">(max 6 for loom)</span>}
+        </label>
         <div className="flex gap-2 items-center">
           <input
             type="range"
             min="2"
-            max="12"
+            max={config.loomCompatible ? LOOM_CONSTRAINTS.maxColors : 12}
             value={config.colorMin}
             onChange={e => onChange({ ...config, colorMin: parseInt(e.target.value) })}
             className="slider flex-1"
@@ -610,7 +630,7 @@ function ConfigPanel({
           <input
             type="range"
             min="2"
-            max="12"
+            max={config.loomCompatible ? LOOM_CONSTRAINTS.maxColors : 12}
             value={config.colorMax}
             onChange={e => onChange({ ...config, colorMax: parseInt(e.target.value) })}
             className="slider flex-1"
@@ -699,11 +719,15 @@ function ConfigPanel({
       </div>
 
       <div>
-        <label className="label">Weave Pattern</label>
+        <label className="label">
+          Weave Pattern
+          {config.loomCompatible && <span className="text-amber-400 text-xs ml-2">(locked to 2/2 Twill)</span>}
+        </label>
         <select
           value={config.weaveType}
           onChange={e => onChange({ ...config, weaveType: e.target.value as WeaveType })}
-          className="input"
+          className={`input ${config.loomCompatible ? 'opacity-50 cursor-not-allowed' : ''}`}
+          disabled={config.loomCompatible}
         >
           {Object.entries(WEAVE_PATTERNS).map(([key, pattern]) => (
             <option key={key} value={key}>{pattern.name}</option>
@@ -800,6 +824,63 @@ function ConfigPanel({
                 </div>
               </>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* Loom Compatible Mode */}
+      <div className="border border-amber-700/30 rounded-lg p-4 bg-amber-900/10">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-amber-400 text-lg">🏭</span>
+            <label className="label mb-0 text-amber-200">Loom Compatible Mode</label>
+          </div>
+          <button
+            onClick={() => {
+              const newLoomMode = !config.loomCompatible;
+              const updates: Partial<GeneratorConfig> = { loomCompatible: newLoomMode };
+              if (newLoomMode) {
+                // Enforce constraints
+                updates.weaveType = LOOM_CONSTRAINTS.weaveType;
+                updates.colorMax = Math.min(config.colorMax, LOOM_CONSTRAINTS.maxColors);
+                updates.colorMin = Math.min(config.colorMin, LOOM_CONSTRAINTS.maxColors);
+              }
+              onChange({ ...config, ...updates });
+            }}
+            className={`w-12 h-6 rounded-full transition-colors ${config.loomCompatible ? 'bg-amber-500' : 'bg-gray-700'}`}
+          >
+            <div className={`w-5 h-5 rounded-full bg-white transition-transform ${config.loomCompatible ? 'translate-x-6' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+        <p className="text-xs text-amber-300/70 mb-3">
+          Constrains patterns for production at Scottish mills (Lochcarron, House of Edgar)
+        </p>
+
+        {config.loomCompatible && (
+          <div className="space-y-3 text-xs">
+            <div className="flex items-center gap-2 text-amber-200">
+              <span className="text-green-400">✓</span>
+              <span>Max 6 colors (mill standard)</span>
+            </div>
+            <div className="flex items-center gap-2 text-amber-200">
+              <span className="text-green-400">✓</span>
+              <span>2/2 Twill weave (traditional tartan)</span>
+            </div>
+            <div className="flex items-center gap-2 text-amber-200">
+              <span className="text-green-400">✓</span>
+              <span>Symmetric sett (warp = weft)</span>
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-amber-700/30">
+              <p className="text-amber-300 font-medium mb-2">Lochcarron Fabric Options:</p>
+              <div className="space-y-1">
+                {LOOM_CONSTRAINTS.fabrics.map(f => (
+                  <div key={f.code} className="text-amber-200/70">
+                    <span className="font-mono text-amber-400">{f.code}</span> {f.name} ({f.weight}) - {f.use}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -2446,6 +2527,7 @@ export default function App() {
     opticalMode: false,
     shapeMask: createDefaultMaskOptions(),
     allowedColors: Object.keys(TARTAN_COLORS),
+    loomCompatible: false,
   });
 
   const [selectedForBuilder, setSelectedForBuilder] = useState<TartanCardData | null>(null);
