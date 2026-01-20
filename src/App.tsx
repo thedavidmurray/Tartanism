@@ -6549,9 +6549,9 @@ export default function App() {
         </div>
 
         <div className={`h-full max-w-7xl mx-auto px-3 py-2 ${sidebarCollapsed ? '' : 'grid md:grid-cols-[260px_1fr] gap-4'}`}>
-          {/* Config Panel - Collapsible */}
+          {/* Config Panel - Collapsible, content-fitted */}
           {!sidebarCollapsed && (
-            <aside className="overflow-y-auto pr-1 scrollbar-thin">
+            <aside className="overflow-y-auto pr-1 scrollbar-thin self-start max-h-[calc(100vh-80px)]">
               <ConfigPanel
                 config={config}
                 onChange={setConfig}
@@ -6563,7 +6563,7 @@ export default function App() {
           )}
 
           {/* Results Grid - Full width when sidebar collapsed */}
-          <section className={`overflow-y-auto scrollbar-thin ${sidebarCollapsed ? 'pt-12' : 'pl-2'}`}>
+          <section className={`overflow-y-auto scrollbar-thin h-full ${sidebarCollapsed ? 'pt-12' : 'pl-2'}`}>
             {/* Breeding Panel */}
             {breedingMode && (
               <div className="mb-6 p-4 bg-gradient-to-r from-pink-900/30 to-purple-900/30 rounded-xl border border-pink-800/50">
